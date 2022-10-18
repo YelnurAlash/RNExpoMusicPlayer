@@ -4,6 +4,7 @@ import songs from '../../model/data';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
 import {play} from '../features/audioControllers';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {width} = Dimensions.get('window');
 
@@ -13,9 +14,59 @@ const Player = () => {
   const [soundObj, setSoundObj] = useState(null);
   const [position, setPosition] = useState(null);
   const [duration, setDuration] = useState(null);
+  const [favorite, setFavorite] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+
+  const getFavoriteSongs = async () => {
+    try {
+      await AsyncStorage.getItem('FavoriteSongs')
+        .then(value => {
+          if (value !== null) {
+            value = JSON.parse(value);
+            setFavorites(() => [...value])
+            
+          }
+        })
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const setData = async () => {
+    try {
+      await AsyncStorage.setItem('FavoriteSongs', JSON.stringify(favorites));
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  useEffect(() => {
+    getFavoriteSongs();
+  }, []);
+
+  const changeFavoriteState = () => {
+    if (favorites.includes(songIndex)) {
+      setFavorite(true)
+    } else {
+      setFavorite(false)
+    }
+  }
+
+  useEffect(() => {
+    changeFavoriteState();
+
+    setData();
+  }, [favorites]);
+
+  const handleFavorite = async () => {
+    if (favorite) {
+      setFavorites(() => favorites.filter(el => el !== songIndex));
+    } else {
+      setFavorites(previousFavorites => [...previousFavorites, songIndex]);
+    }
+  }
 
   const onPlaybackStatusUpdate = (status) => {
-    console.log(status);
     if (status.isLoaded && status.isPlaying) {
       setPosition(status.positionMillis)
       setDuration(status.durationMillis)
@@ -65,6 +116,8 @@ const Player = () => {
       index: songIndex
     });
 
+    changeFavoriteState();
+
     if (soundObj !== null && soundObj.status.isPlaying) {
       stopMusicOnScroll().then(() => {
         play(songs[songIndex], setSoundObj, onPlaybackStatusUpdate);
@@ -95,13 +148,16 @@ const Player = () => {
           }}
           horizontal
           pagingEnabled
+          showsHorizontalScrollIndicator={false}
          />
          <View style={styles.songDataContainer}>
             <View>
               <Text style={styles.title}>{songs[songIndex].title}</Text>
               <Text style={styles.artist}>{songs[songIndex].artist}</Text>
             </View>
-            <Ionicons name='heart-outline' size={24} color='#00FFFF' />
+            <Pressable onPress={handleFavorite}>
+              <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={30} color='#00FFFF' />
+            </Pressable>
          </View>
          <Slider
             style={styles.slider}
